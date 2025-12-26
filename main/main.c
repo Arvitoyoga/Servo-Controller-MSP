@@ -16,13 +16,16 @@
 #define MAX_CHANNELS    16
 #define MSP_CMD_RC      105
 
-#define SERVO_A_GPIO    GPIO_NUM_25
-#define SERVO_B_GPIO    GPIO_NUM_26
+#define SERVO_A_GPIO    GPIO_NUM_12
+#define SERVO_B_GPIO    GPIO_NUM_13
+#define SERVO_C_GPIO    GPIO_NUM_14
+#define SERVO_D_GPIO    GPIO_NUM_25
+#define SERVO_E_GPIO    GPIO_NUM_26
+#define SERVO_F_GPIO    GPIO_NUM_27
 
 #define SERVO_FREQ      50
 #define SERVO_MIN_US    1000
 #define SERVO_MAX_US    2000
-#define SERVO_MAX_DEG   180
 
 #define MIN_CHANNEL     1000
 #define MAX_CHANNEL     2000
@@ -31,14 +34,22 @@
 #define LEDC_MODE       LEDC_LOW_SPEED_MODE
 #define LEDC_RES        LEDC_TIMER_16_BIT
 
-#define SERVO_A_CH      LEDC_CHANNEL_0
-#define SERVO_B_CH      LEDC_CHANNEL_1
+#define SERVO_A_CH  LEDC_CHANNEL_0
+#define SERVO_B_CH  LEDC_CHANNEL_1
+#define SERVO_C_CH  LEDC_CHANNEL_2
+#define SERVO_D_CH  LEDC_CHANNEL_3
+#define SERVO_E_CH  LEDC_CHANNEL_4
+#define SERVO_F_CH  LEDC_CHANNEL_5
 
 static const char *TAG = "MSP_SERVO";
 
 uint16_t rc_channels[MAX_CHANNELS];
 uint16_t ServoA = 1500;
 uint16_t ServoB = 1500;
+uint16_t ServoC = 1500;
+uint16_t ServoD = 1500;
+uint16_t ServoE = 1500;
+uint16_t ServoF = 1500;
 SemaphoreHandle_t rc_mutex;
 
 int32_t map_constrain(int32_t x,
@@ -99,8 +110,29 @@ void servo_init(void)
     ch_b.channel  = SERVO_B_CH;
     ch_b.gpio_num = SERVO_B_GPIO;
 
+    ledc_channel_config_t ch_c = ch_a;
+    ch_c.channel  = SERVO_C_CH;
+    ch_c.gpio_num = SERVO_C_GPIO;
+
+    ledc_channel_config_t ch_d = ch_a;
+    ch_d.channel  = SERVO_D_CH;
+    ch_d.gpio_num = SERVO_D_GPIO;
+
+    ledc_channel_config_t ch_e = ch_a;
+    ch_e.channel  = SERVO_E_CH;
+    ch_e.gpio_num = SERVO_E_GPIO;
+
+    ledc_channel_config_t ch_f = ch_a;
+    ch_f.channel  = SERVO_F_CH;
+    ch_f.gpio_num = SERVO_F_GPIO;
+
+
     ledc_channel_config(&ch_a);
     ledc_channel_config(&ch_b);
+    ledc_channel_config(&ch_c);
+    ledc_channel_config(&ch_d);
+    ledc_channel_config(&ch_e);
+    ledc_channel_config(&ch_f);
 }
 
 void msp_uart_init(void)
@@ -188,19 +220,29 @@ void main_task(void *arg)
         memcpy(rc, rc_channels, sizeof(rc));
         xSemaphoreGive(rc_mutex);
 
-        if (rc[13] <= 1500) {
-            ServoA = rc[12];
-        } else {
-            ServoB = rc[12];
+        /* ===== MULTIPLEXER SERVO ===== */
+        if (rc[14] <= 1500) {              
+            if (rc[13] < 1250)       ServoA = rc[12];
+            else if (rc[13] < 1750)  ServoB = rc[12];
+            else                     ServoC = rc[12];
+        } else {                              
+            if (rc[13] < 1250)       ServoD = rc[12];
+            else if (rc[13] < 1750)  ServoE = rc[12];
+            else                     ServoF = rc[12];
         }
 
+        /* ===== APPLY SERVO ===== */
         servo_set_from_rc(SERVO_A_CH, ServoA);
         servo_set_from_rc(SERVO_B_CH, ServoB);
+        servo_set_from_rc(SERVO_C_CH, ServoC);
+        servo_set_from_rc(SERVO_D_CH, ServoD);
+        servo_set_from_rc(SERVO_E_CH, ServoE);
+        servo_set_from_rc(SERVO_F_CH, ServoF);
 
-        // ESP_LOGI(TAG, "ServoA:%d ServoB:%d", ServoA, ServoB);
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
+
 
 void app_main(void)
 {
